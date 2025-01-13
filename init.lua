@@ -230,6 +230,7 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
+  'github/copilot.vim',
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -616,8 +617,26 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        pyright = {},
-        rust_analyzer = {},
+        -- jedi_language_server = {},
+        -- pylsp = {},
+        ruff = {
+          on_attach = function(client, bufnr)
+            -- Disable hover in favor of Pyright
+            client.server_capabilities.hoverProvider = false
+            -- Organize imports via code action on save
+            vim.api.nvim_create_autocmd('BufWritePre', {
+              buffer = bufnr,
+              callback = function()
+                vim.lsp.buf.code_action {
+                  context = { only = { 'source.organizeImports' }, diagnostics = vim.lsp.diagnostic.get_line_diagnostics() },
+                  apply = true,
+                }
+                vim.wait(100)
+              end,
+            })
+          end,
+        },
+        -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -752,6 +771,7 @@ require('lazy').setup({
       --  into multiple repos for maintenance purposes.
       'hrsh7th/cmp-nvim-lsp',
       'hrsh7th/cmp-path',
+      'hrsh7th/cmp-nvim-lsp-signature-help',
     },
     config = function()
       -- See `:help cmp`
@@ -828,6 +848,7 @@ require('lazy').setup({
           { name = 'nvim_lsp' },
           { name = 'luasnip' },
           { name = 'path' },
+          { name = 'nvim_lsp_signature_help' },
         },
       }
     end,
@@ -891,6 +912,12 @@ require('lazy').setup({
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
+  {
+    'mrcjkb/rustaceanvim',
+    version = '^5', -- Recommended
+    lazy = false, -- This plugin is already lazy
+  },
+  'mfussenegger/nvim-dap',
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
