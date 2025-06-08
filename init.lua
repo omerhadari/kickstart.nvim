@@ -230,7 +230,7 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
-  'github/copilot.vim',
+  'nvim-java/nvim-java',
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -588,6 +588,13 @@ require('lazy').setup({
           end
         end,
       })
+      vim.o.updatetime = 250
+      vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
+        group = vim.api.nvim_create_augroup('float_diagnostic', { clear = true }),
+        callback = function()
+          vim.diagnostic.open_float(nil, { focus = false })
+        end,
+      })
 
       -- Change diagnostic symbols in the sign column (gutter)
       -- if vim.g.have_nerd_font then
@@ -679,6 +686,8 @@ require('lazy').setup({
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       require('mason-lspconfig').setup {
+        ensure_installed = { 'ruff' },
+        automatic_installation = true,
         handlers = {
           function(server_name)
             local server = servers[server_name] or {}
@@ -687,6 +696,16 @@ require('lazy').setup({
             -- certain features of an LSP (for example, turning off formatting for ts_ls)
             server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
             require('lspconfig')[server_name].setup(server)
+          end,
+          jdtls = function()
+            require('java').setup {
+              spring_boot_tools = {
+                enable = false,
+                version = '1.55.1',
+              }, -- Your custom jdtls settings goes here
+            }
+
+            require('lspconfig').jdtls.setup {}
           end,
         },
       }
@@ -713,7 +732,7 @@ require('lazy').setup({
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
+        local disable_filetypes = { c = true, cpp = true, java = true, python = true }
         local lsp_format_opt
         if disable_filetypes[vim.bo[bufnr].filetype] then
           lsp_format_opt = 'never'
@@ -729,13 +748,14 @@ require('lazy').setup({
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
+        xml = { 'xmllint' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        --     formatters = {
       },
     },
   },
-
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
     event = 'InsertEnter',
@@ -917,14 +937,66 @@ require('lazy').setup({
     version = '^5', -- Recommended
     lazy = false, -- This plugin is already lazy
   },
-  'mfussenegger/nvim-dap',
+  {
+    'mfussenegger/nvim-dap',
+    config = function()
+      vim.keymap.set('n', '<F5>', function()
+        require('dap').continue()
+      end)
+      vim.keymap.set('n', '<F8>', function()
+        require('dap').step_over()
+      end)
+      vim.keymap.set('n', '<F7>', function()
+        require('dap').step_into()
+      end)
+      vim.keymap.set('n', '<S-F8>', function()
+        require('dap').step_out()
+      end)
+      vim.keymap.set('n', '<Leader>b', function()
+        require('dap').toggle_breakpoint()
+      end)
+      vim.keymap.set('n', '<Leader>B', function()
+        require('dap').set_breakpoint()
+      end)
+      vim.keymap.set('n', '<Leader>lp', function()
+        require('dap').set_breakpoint(nil, nil, vim.fn.input 'Log point message: ')
+      end)
+      vim.keymap.set('n', '<Leader>dr', function()
+        require('dap').repl.open()
+      end)
+      vim.keymap.set('n', '<Leader>dl', function()
+        require('dap').run_last()
+      end)
+      vim.keymap.set({ 'n', 'v' }, '<Leader>dh', function()
+        require('dap.ui.widgets').hover()
+      end)
+      vim.keymap.set({ 'n', 'v' }, '<Leader>dp', function()
+        require('dap.ui.widgets').preview()
+      end)
+      vim.keymap.set('n', '<Leader>df', function()
+        local widgets = require 'dap.ui.widgets'
+        widgets.centered_float(widgets.frames)
+      end)
+      vim.keymap.set('n', '<Leader>ds', function()
+        local widgets = require 'dap.ui.widgets'
+        widgets.centered_float(widgets.scopes)
+      end)
+    end,
+  },
+  {
+    'numToStr/FTerm.nvim',
+    config = function()
+      vim.api.nvim_create_user_command('FTermToggle', require('FTerm').toggle, { bang = true })
+      vim.keymap.set('n', '<Leader>tt', ':FTermToggle<CR>')
+    end,
+  },
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'java' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -942,6 +1014,17 @@ require('lazy').setup({
     --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+  },
+  {
+    'stevearc/oil.nvim',
+    ---@module 'oil'
+    ---@type oil.SetupOpts
+    opts = {},
+    -- Optional dependencies
+    dependencies = { { 'echasnovski/mini.icons', opts = {} } },
+    -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if you prefer nvim-web-devicons
+    -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
+    lazy = false,
   },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
